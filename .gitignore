@@ -1,0 +1,6 @@
+/DiT/cifar10_train/
+/DiT/results/
+/ddpm/Checkpoints/
+/ddpm/CheckpointsCondition/
+/ddpm/CIFAR10/
+/.venv/

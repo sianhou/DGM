@@ -26,7 +26,7 @@ def main(args):
                 learn_sigma=args.learn_sigma
                 ).to(device)
     checkpoint = torch.load(args.ckpt, map_location=device, weights_only=False)
-    model.load_state_dict(checkpoint["ema"])
+    model.load_state_dict(checkpoint["model"])
     model.eval()
     diffusion = create_diffusion(str(args.num_sampling_steps))
 

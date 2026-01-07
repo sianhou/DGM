@@ -77,8 +77,7 @@ def main(args):
     # Setup optimizer (we used default Adam betas=(0.9, 0.999) and a constant learning rate of 1e-4 in our paper):
     opt = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0)
 
-    transform = transforms.Compose([
-        transforms.Resize(args.input_size),  # 调整到指定大小
+    transform = transforms.Compose([  # 调整到指定大小
         transforms.ToTensor(),  # [0,255] → [0,1]
         transforms.Normalize(mean=[0.5, 0.5, 0.5],  # [0,1] → [-1,1]
                              std=[0.5, 0.5, 0.5])

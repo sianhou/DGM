@@ -10,6 +10,7 @@
 # --------------------------------------------------------
 
 import math
+from typing import Optional
 
 import numpy as np
 import torch
@@ -154,16 +155,16 @@ class DiT(nn.Module):
 
     def __init__(
             self,
-            input_size=32,
-            patch_size=2,
-            in_channels=4,
-            hidden_size=1152,
-            depth=28,
-            num_heads=16,
-            mlp_ratio=4.0,
-            class_dropout_prob=0.1,
-            num_classes=1000,
-            learn_sigma=False,
+            input_size: int,
+            patch_size: int = 4,
+            in_channels: int = 3,
+            hidden_size: int = 384,
+            depth: int = 8,
+            num_heads: int = 6,
+            mlp_ratio: int = 4.0,
+            class_dropout_prob: float = 0,
+            num_classes: Optional[int] = None,
+            learn_sigma: bool = True,
     ):
         super().__init__()
         self.learn_sigma = learn_sigma
@@ -171,10 +172,12 @@ class DiT(nn.Module):
         self.out_channels = in_channels * 2 if learn_sigma else in_channels
         self.patch_size = patch_size
         self.num_heads = num_heads
+        self.num_classes = num_classes
 
         self.x_embedder = PatchEmbed(input_size, patch_size, in_channels, hidden_size, bias=True)
         self.t_embedder = TimestepEmbedder(hidden_size)
-        self.y_embedder = LabelEmbedder(num_classes, hidden_size, class_dropout_prob)
+        if self.num_classes is not None:
+            self.y_embedder = LabelEmbedder(num_classes, hidden_size, class_dropout_prob)
         num_patches = self.x_embedder.num_patches
         # Will use fixed sin-cos embedding:
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, hidden_size), requires_grad=False)
@@ -205,7 +208,8 @@ class DiT(nn.Module):
         nn.init.constant_(self.x_embedder.proj.bias, 0)
 
         # Initialize label embedding table:
-        nn.init.normal_(self.y_embedder.embedding_table.weight, std=0.02)
+        if self.num_classes is not None:
+            nn.init.normal_(self.y_embedder.embedding_table.weight, std=0.02)
 
         # Initialize timestep embedding MLP:
         nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
@@ -237,7 +241,7 @@ class DiT(nn.Module):
         imgs = x.reshape(shape=(x.shape[0], c, h * p, h * p))
         return imgs
 
-    def forward(self, x, t, y):
+    def forward(self, x, t, extra):
         """
         Forward pass of DiT.
         x: (N, C, H, W) tensor of spatial inputs (images or latent representations of images)
@@ -245,9 +249,24 @@ class DiT(nn.Module):
         y: (N,) tensor of class labels
         """
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
-        t = self.t_embedder(t)  # (N, D)
-        y = self.y_embedder(y, self.training)  # (N, D)
-        c = t + y  # (N, D)
+        c = self.t_embedder(t)  # (N, D)
+
+        if self.num_classes and "label" not in extra:
+            # Hack to deal with ddp find_unused_parameters not working with activation checkpointing...
+            # self.num_classes corresponds to the pad index of the embedding table
+            extra["label"] = torch.full(
+                (x.size(0),), self.num_classes, dtype=torch.long, device=x.device
+            )
+
+        if self.num_classes is not None and "label" in extra:
+            y = extra["label"]
+            assert (
+                    y.shape == x.shape[:1]
+            ), f"Labels have shape {y.shape}, which does not match the batch dimension of the input {x.shape}"
+
+            y = self.y_embedder(y, self.training)  # (N, D)
+            c += y
+
         for block in self.blocks:
             x = block(x, c)  # (N, T, D)
         x = self.final_layer(x, c)  # (N, T, patch_size ** 2 * out_channels)

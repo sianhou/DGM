@@ -1,57 +1,24 @@
+
+
 import os
 from typing import Dict
-
 import numpy as np
+
 import torch
 import torch.optim as optim
-from DiffusionFreeGuidence.DiffusionCondition import GaussianDiffusionSampler, GaussianDiffusionTrainer
-from DiffusionFreeGuidence.ModelCondition import UNet
-from Scheduler import GradualWarmupScheduler
+from tqdm import tqdm
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.datasets import CIFAR10
 from torchvision.utils import save_image
-from tqdm import tqdm
 
-from Logger import DGMLogger
-
-
-def setup_logger(save_dir):
-    os.makedirs(save_dir, exist_ok=True)
-
-    logger = logging.getLogger("train_logger")
-    logger.setLevel(logging.INFO)
-    logger.handlers.clear()
-
-    formatter = logging.Formatter(
-        "[%(asctime)s][%(levelname)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
-
-    # console
-    ch = logging.StreamHandler()
-    ch.setFormatter(formatter)
-
-    # file
-    fh = logging.FileHandler(os.path.join(save_dir, "train.log"))
-    fh.setFormatter(formatter)
-
-    logger.addHandler(ch)
-    logger.addHandler(fh)
-
-    return logger
+from DiffusionFreeGuidence.DiffusionCondition import GaussianDiffusionSampler, GaussianDiffusionTrainer
+from DiffusionFreeGuidence.ModelCondition import UNet
+from Scheduler import GradualWarmupScheduler
 
 
 def train(modelConfig: Dict):
     device = torch.device(modelConfig["device"])
-    logger = setup_logger(modelConfig["save_dir"])
-
-    logger.info("===== Training Started =====")
-    logger.info(f"Config: {modelConfig}")
-    logger.info(f"Using device: {device}")
-
-    logging = DGMLogger(log_dir="./runs/TrainCondition_Exp1", log_interval=100)
-
     # dataset
     dataset = CIFAR10(
         root='./CIFAR10', train=True, download=True,
@@ -82,18 +49,13 @@ def train(modelConfig: Dict):
     for e in range(modelConfig["epoch"]):
         with tqdm(dataloader, dynamic_ncols=True) as tqdmDataLoader:
             for images, labels in tqdmDataLoader:
-                # data
+                # train
                 b = images.shape[0]
+                optimizer.zero_grad()
                 x_0 = images.to(device)
                 labels = labels.to(device) + 1
-
-                # classifier-free guidance
                 if np.random.rand() < 0.1:
                     labels = torch.zeros_like(labels).to(device)
-
-                # train
-                optimizer.zero_grad()
-
                 loss = trainer(x_0, labels).sum() / b ** 2.
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(
@@ -138,9 +100,9 @@ def eval(modelConfig: Dict):
             size=[modelConfig["batch_size"], 3, modelConfig["img_size"], modelConfig["img_size"]], device=device)
         saveNoisy = torch.clamp(noisyImage * 0.5 + 0.5, 0, 1)
         save_image(saveNoisy, os.path.join(
-            modelConfig["sampled_dir"], modelConfig["sampledNoisyImgName"]), nrow=modelConfig["nrow"])
+            modelConfig["sampled_dir"],  modelConfig["sampledNoisyImgName"]), nrow=modelConfig["nrow"])
         sampledImgs = sampler(noisyImage, labels)
         sampledImgs = sampledImgs * 0.5 + 0.5  # [0 ~ 1]
         print(sampledImgs)
         save_image(sampledImgs, os.path.join(
-            modelConfig["sampled_dir"], modelConfig["sampledImgName"]), nrow=modelConfig["nrow"])
+            modelConfig["sampled_dir"],  modelConfig["sampledImgName"]), nrow=modelConfig["nrow"])

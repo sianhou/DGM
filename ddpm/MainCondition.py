@@ -27,7 +27,6 @@ def main(model_config=None):
         "sampledImgName": "SampledGuidenceImgs.png",
         "nrow": 8
     }
-
     if model_config is not None:
         modelConfig = model_config
     if modelConfig["state"] == "train":

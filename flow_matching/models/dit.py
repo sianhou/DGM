@@ -249,8 +249,8 @@ class DiT(nn.Module):
         y: (N,) tensor of class labels
         """
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
-        c = self.t_embedder(t)  # (N, D)
-
+        t = self.t_embedder(t)  # (N, D)
+        c = t
         if self.num_classes and "label" not in extra:
             # Hack to deal with ddp find_unused_parameters not working with activation checkpointing...
             # self.num_classes corresponds to the pad index of the embedding table
@@ -265,7 +265,7 @@ class DiT(nn.Module):
             ), f"Labels have shape {y.shape}, which does not match the batch dimension of the input {x.shape}"
 
             y = self.y_embedder(y, self.training)  # (N, D)
-            c += y
+            c = t + y
 
         for block in self.blocks:
             x = block(x, c)  # (N, T, D)

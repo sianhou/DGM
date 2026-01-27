@@ -407,16 +407,11 @@ DiT_models = {
 }
 
 if __name__ == '__main__':
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
     batch_size = 8
-    model = DiT(32, 4, 3, 384, 4, 4, 4.0, 0.1, 10, False).to(device)
-    x = torch.randn(batch_size, 3, 32, 32).to(device)
-    t = torch.randint(1000, size=[batch_size]).to(device)
-    labels = torch.randint(10, size=[batch_size]).to(device)
-    y = model(x, t, labels)
+    model = DiT(32, 4, 3, 384, 4, 4, 4.0, 0.1, None, False)
+    x = torch.randn(batch_size, 3, 32, 32)
+    t = torch.randint(1000, size=[batch_size])
+    labels = torch.randint(10, size=[batch_size])
+    y = model(x, t, None)
 
-    model2 = DiT(32, 4, 3, 384, 4, 4, 4.0, 0.1, 10, True).to(device)
-    y2 = model2(x, t, labels)
-    print(f"dit without sigma f{y.shape}")
-    print(f"dit with sigma f{y2.shape}")
+    print(y.shape)

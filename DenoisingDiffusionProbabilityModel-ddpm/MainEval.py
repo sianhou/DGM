@@ -7,7 +7,7 @@ from torchvision import transforms
 from torchvision.datasets import CIFAR10
 from torchvision.utils import save_image
 
-from ddpm.Diffusion import UNet, GaussianDiffusionSampler
+from Diffusion import UNet, GaussianDiffusionSampler
 
 
 def main(model_config=None):

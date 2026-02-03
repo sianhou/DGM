@@ -5,9 +5,14 @@ import os
 import shutil
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.utils.checkpoint
+import copy
+import json
 import torchvision
+
+from dataclasses import dataclass, asdict
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import (
@@ -16,10 +21,12 @@ from accelerate.utils import (
     set_seed,
 )
 from diffusers.optimization import get_scheduler
-from rectified_flow.models.dit import DiT, DiTConfig
-from rectified_flow.rectified_flow import RectifiedFlow
+
 from torchvision import transforms
 from tqdm.auto import tqdm
+
+from rectified_flow.models.dit import DiT, DiTConfig
+from rectified_flow.rectified_flow import RectifiedFlow
 
 logger = get_logger(__name__)
 
@@ -374,10 +381,10 @@ def main(args):
 
     if args.scale_lr:
         args.learning_rate = (
-                args.learning_rate
-                * args.gradient_accumulation_steps
-                * args.train_batch_size
-                * accelerator.num_processes
+            args.learning_rate
+            * args.gradient_accumulation_steps
+            * args.train_batch_size
+            * accelerator.num_processes
         )
 
     # 1.1 Prepare models
@@ -421,7 +428,7 @@ def main(args):
     transform = transforms.Compose(transform_list)
 
     train_dataset = torchvision.datasets.CIFAR10(
-        root=args.data_root, train=True, download=True, transform=transform
+        root=args.data_root, train=True, download=False, transform=transform
     )
     logger.info(f"Train dataset size: {len(train_dataset)}, root: {args.data_root}")
 
@@ -522,9 +529,9 @@ def main(args):
         accelerator.init_trackers(tracker_name, config=vars(args))
 
     total_batch_size = (
-            args.train_batch_size
-            * accelerator.num_processes
-            * args.gradient_accumulation_steps
+        args.train_batch_size
+        * accelerator.num_processes
+        * args.gradient_accumulation_steps
     )
 
     logger.info("***** Running training *****")
@@ -615,7 +622,7 @@ def main(args):
                             )
                             if len(checkpoints) >= args.checkpoints_total_limit:
                                 num_to_remove = (
-                                        len(checkpoints) - args.checkpoints_total_limit + 1
+                                    len(checkpoints) - args.checkpoints_total_limit + 1
                                 )
                                 removing_checkpoints = checkpoints[0:num_to_remove]
                                 logger.info(
